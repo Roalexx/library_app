@@ -1,1 +1,8 @@
-flask_sqlalchemy
+Flask
+flasgger
+Flask-SQLAlchemy
+Flask-Migrate
+python-dotenv
+psycopg2-binary
+celery
+redis
