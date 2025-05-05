@@ -47,7 +47,6 @@ def add_book():
     }
 })
 def get_all_books():
-    print("⛓ Connected to:", db.engine.url)
     books = Book.query.all()
     return jsonify([
         {'id': b.id, 'title': b.title, 'author': b.author, 'total_copies': b.total_copies, 'available_copies': b.available_copies}

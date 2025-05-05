@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from app.models import db, User
 from werkzeug.security import generate_password_hash
 from flasgger.utils import swag_from
+from flask_jwt_extended import jwt_required, current_user
 
 user_bp = Blueprint("user", __name__)
 
@@ -10,7 +11,7 @@ user_bp = Blueprint("user", __name__)
     'tags': ['Users'],
     'summary': 'Create a new user',
     'description': 'Creates a new user with username, email, and password.',
-    'consumes': ['application/json'],
+    'consumes': ['application/x-www-form-urlencoded'],
     'parameters': [
         {'name':'username', 'in': 'formData', 'type': 'string', 'required': True, 'description': 'Username'},
         {'name':'email', 'in': 'formData', 'type': 'string', 'required': True, 'description': 'e-mail'},
@@ -26,11 +27,17 @@ user_bp = Blueprint("user", __name__)
     }
 })
 def create_user():
-    data = request.get_json()
+    username = request.form.get("username")
+    email = request.form.get("email")
+    password = request.form.get("password")
+
+    if not username or not email or not password:
+        return jsonify({"error": "Eksik veri"}), 400
+
     new_user = User(
-        username=data["username"],
-        email=data["email"],
-        password_hash=generate_password_hash(data["password"])
+        username=username,
+        email=email,
+        password_hash=generate_password_hash(password)
     )
     db.session.add(new_user)
     db.session.commit()
@@ -60,12 +67,15 @@ def list_users():
     ])
 
 
-@user_bp.route("/users/<int:user_id>", methods=["PUT"])
+@user_bp.route("/users", methods=["PUT"])
 @swag_from({
     'tags': ['Users'],
     'summary': 'Update a user',
+    'security': [{'Bearer': []}],
     'description': 'Updates the username, email or password of a user.',
+    'consumes': ['application/x-www-form-urlencoded'],
     'parameters': [
+        {'name':'user_id', 'in': 'formData', 'type': 'integer', 'required': True, 'description': 'User ID'},
         {'name':'username', 'in': 'formData', 'type': 'string', 'required': True, 'description': 'Username'},
         {'name':'email', 'in': 'formData', 'type': 'string', 'required': True, 'description': 'e-mail'},
         {'name':'password', 'in': 'formData', 'type': 'string', 'required': True, 'description': 'Password'}
@@ -79,26 +89,31 @@ def list_users():
         }
     }
 })
-def update_user(user_id):
+@jwt_required()
+def update_user():
+    user_id = request.form.get("user_id", type=int)
     user = User.query.get_or_404(user_id)
-    data = request.get_json()
 
-    user.username = data.get("username", user.username)
-    user.email = data.get("email", user.email)
-    if "password" in data:
-        user.password_hash = generate_password_hash(data["password"])
+    user.username = request.form.get("username")
+    user.email = request.form.get("email")
+
+    password = request.form.get("password")
+    if password:
+        user.password_hash = generate_password_hash(password)
 
     db.session.commit()
-    return jsonify({"message": "User updated"})
+    return jsonify({"message": "User updated"}), 200
 
 
-@user_bp.route("/users/<int:user_id>", methods=["DELETE"])
+@user_bp.route("/users", methods=["DELETE"])
 @swag_from({
     'tags': ['Users'],
     'summary': 'Delete a user',
+    'security': [{'Bearer': []}],
     'description': 'Deletes a user by ID.',
+    'consumes': ['application/x-www-form-urlencoded'],
     'parameters': [
-        {'name':'user_id', 'in': 'formData', 'type': 'string', 'required': True, 'description': 'User ID to delete'},        
+        {'name':'user_id', 'in': 'formData', 'type': 'integer', 'required': True, 'description': 'User ID to delete'},        
     ],
     'responses': {
         200: {
@@ -112,7 +127,9 @@ def update_user(user_id):
         }
     }
 })
-def delete_user(user_id):
+@jwt_required()
+def delete_user():
+    user_id = request.form.get("user_id", type=int)
     user = User.query.get_or_404(user_id)
     db.session.delete(user)
     db.session.commit()

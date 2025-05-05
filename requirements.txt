@@ -6,3 +6,4 @@ python-dotenv
 psycopg2-binary
 celery
 redis
+flask_jwt_extended
