@@ -12,19 +12,9 @@ user_bp = Blueprint("user", __name__)
     'description': 'Creates a new user with username, email, and password.',
     'consumes': ['application/json'],
     'parameters': [
-        {
-            'name': 'body',
-            'in': 'body',
-            'required': True,
-            'schema': {
-                'properties': {
-                    'username': {'type': 'string', 'example': 'elovate'},
-                    'email': {'type': 'string', 'example': 'elo@email.com'},
-                    'password': {'type': 'string', 'example': '123456'}
-                },
-                'required': ['username', 'email', 'password']
-            }
-        }
+        {'name':'username', 'in': 'formData', 'type': 'string', 'required': True, 'description': 'Username'},
+        {'name':'email', 'in': 'formData', 'type': 'string', 'required': True, 'description': 'e-mail'},
+        {'name':'password', 'in': 'formData', 'type': 'string', 'required': True, 'description': 'Password'}
     ],
     'responses': {
         201: {
@@ -66,7 +56,7 @@ def create_user():
 def list_users():
     users = User.query.all()
     return jsonify([
-        {"id": u.id, "username": u.username, "email": u.email} for u in users
+        {"id": user.id, "username": user.username, "email": user.email} for user in users
     ])
 
 
@@ -76,25 +66,9 @@ def list_users():
     'summary': 'Update a user',
     'description': 'Updates the username, email or password of a user.',
     'parameters': [
-        {
-            'name': 'user_id',
-            'in': 'path',
-            'type': 'integer',
-            'required': True,
-            'description': 'User ID'
-        },
-        {
-            'name': 'body',
-            'in': 'body',
-            'required': True,
-            'schema': {
-                'properties': {
-                    'username': {'type': 'string', 'example': 'updated_user'},
-                    'email': {'type': 'string', 'example': 'new@email.com'},
-                    'password': {'type': 'string', 'example': 'newpass123'}
-                }
-            }
-        }
+        {'name':'username', 'in': 'formData', 'type': 'string', 'required': True, 'description': 'Username'},
+        {'name':'email', 'in': 'formData', 'type': 'string', 'required': True, 'description': 'e-mail'},
+        {'name':'password', 'in': 'formData', 'type': 'string', 'required': True, 'description': 'Password'}
     ],
     'responses': {
         200: {
@@ -124,13 +98,7 @@ def update_user(user_id):
     'summary': 'Delete a user',
     'description': 'Deletes a user by ID.',
     'parameters': [
-        {
-            'name': 'user_id',
-            'in': 'path',
-            'type': 'integer',
-            'required': True,
-            'description': 'User ID to delete'
-        }
+        {'name':'user_id', 'in': 'formData', 'type': 'string', 'required': True, 'description': 'User ID to delete'},        
     ],
     'responses': {
         200: {
