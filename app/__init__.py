@@ -15,6 +15,9 @@ def create_app():
     migrate.init_app(app, db)
     Swagger(app)
 
+    from app.routes.books import books_bp
+    app.register_blueprint(books_bp)
+
     from app.routes.user import user_bp
     app.register_blueprint(user_bp)
 
