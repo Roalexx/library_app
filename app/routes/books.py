@@ -8,10 +8,22 @@ books_bp = Blueprint('books', __name__)
 @swag_from({
     'tags': ['Books'],
     'summary': 'Add a new book',
+    'consumes': ['application/json'],
     'parameters': [
-        {'name': 'title', 'in': 'formData', 'type': 'string', 'required': True, 'description': 'Book title'},
-        {'name': 'author', 'in': 'formData', 'type': 'string', 'required': True, 'description': 'Book author'},
-        {'name': 'total_copies', 'in': 'formData', 'type': 'integer', 'required': True, 'description': 'Total number of copies'}
+        {
+            'name': 'body',
+            'in': 'body',
+            'required': True,
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'title': {'type': 'string'},
+                    'author': {'type': 'string'},
+                    'total_copies': {'type': 'integer'}
+                },
+                'required': ['title', 'author', 'total_copies']
+            }
+        }
     ],
     'responses': {
         201: {'description': 'Book successfully added'},
@@ -19,9 +31,10 @@ books_bp = Blueprint('books', __name__)
     }
 })
 def add_book():
-    title = request.form.get('title')
-    author = request.form.get('author')
-    total_copies = request.form.get('total_copies', type=int)
+    data = request.get_json()
+    title = data.get('title')
+    author = data.get('author')
+    total_copies = data.get('total_copies')
 
     if not title or not author or total_copies is None:
         return jsonify({'error': 'Eksik veri'}), 400
@@ -30,6 +43,7 @@ def add_book():
     db.session.add(book)
     db.session.commit()
     return jsonify({'message': 'Kitap eklendi', 'book_id': book.id}), 201
+
 
 @books_bp.route('/books', methods=['GET'])
 @swag_from({
@@ -49,9 +63,16 @@ def add_book():
 def get_all_books():
     books = Book.query.all()
     return jsonify([
-        {'id': b.id, 'title': b.title, 'author': b.author, 'total_copies': b.total_copies, 'available_copies': b.available_copies}
+        {
+            'id': b.id,
+            'title': b.title,
+            'author': b.author,
+            'total_copies': b.total_copies,
+            'available_copies': b.available_copies
+        }
         for b in books
     ]), 200
+
 
 @books_bp.route('/books/<int:book_id>', methods=['GET'])
 @swag_from({
@@ -78,6 +99,7 @@ def get_book(book_id):
         'available_copies': book.available_copies
     }), 200
 
+
 @books_bp.route('/books/<int:book_id>', methods=['DELETE'])
 @swag_from({
     'tags': ['Books'],
@@ -99,16 +121,28 @@ def delete_book(book_id):
     db.session.commit()
     return jsonify({'message': 'Kitap silindi'}), 200
 
+
 @books_bp.route('/books/<int:book_id>', methods=['PUT'])
 @swag_from({
     'tags': ['Books'],
     'summary': 'Update a book by ID',
+    'consumes': ['application/json'],
     'parameters': [
-        {'name': 'book_id', 'in': 'path', 'type': 'integer', 'required': True, 'description': 'Book ID to update'},
-        {'name': 'title', 'in': 'formData', 'type': 'string', 'required': False, 'description': 'New title'},
-        {'name': 'author', 'in': 'formData', 'type': 'string', 'required': False, 'description': 'New author'},
-        {'name': 'total_copies', 'in': 'formData', 'type': 'integer', 'required': False, 'description': 'New total copies'},
-        {'name': 'available_copies', 'in': 'formData', 'type': 'integer', 'required': False, 'description': 'New available copies'}
+        {'name': 'book_id', 'in': 'path', 'type': 'integer', 'required': True},
+        {
+            'name': 'body',
+            'in': 'body',
+            'required': True,
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'title': {'type': 'string'},
+                    'author': {'type': 'string'},
+                    'total_copies': {'type': 'integer'},
+                    'available_copies': {'type': 'integer'}
+                }
+            }
+        }
     ],
     'responses': {
         200: {'description': 'Book updated'},
@@ -120,10 +154,11 @@ def update_book(book_id):
     if not book:
         return jsonify({'error': 'Kitap bulunamadı'}), 404
 
-    book.title = request.form.get('title', book.title)
-    book.author = request.form.get('author', book.author)
-    book.total_copies = request.form.get('total_copies', type=int) or book.total_copies
-    book.available_copies = request.form.get('available_copies', type=int) or book.available_copies
+    data = request.get_json()
+    book.title = data.get('title', book.title)
+    book.author = data.get('author', book.author)
+    book.total_copies = data.get('total_copies', book.total_copies)
+    book.available_copies = data.get('available_copies', book.available_copies)
 
     db.session.commit()
     return jsonify({'message': 'Kitap güncellendi'}), 200

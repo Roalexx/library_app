@@ -127,33 +127,46 @@ def get_all_deactive_loans():
         for loan in loans
     ]),200
 
-@loan_bp.route("/loans/deliver", methods=["POST"])
+@loan_bp.route("/loan/<int:loan_id>", methods=["POST"])
 @swag_from({
     'tags': ['Loans'],
     'summary': 'Deliver a loan',
     'security': [{'Bearer': []}],
-    'consumes': ['application/x-www-form-urlencoded'],
     'parameters': [
-        {'name': 'loan_id', 'in': 'formData', 'type': 'string', 'required': True, 'description': 'ID of loan'},
+        {
+            'name': 'loan_id',
+            'in': 'path',
+            'type': 'integer',
+            'required': True,
+            'description': 'ID of the loan to be delivered'
+        }
     ],
     'responses': {
         201: {'description': 'Book delivered successfully.'},
         400: {'description': 'Invalid data'},
-        403: {'msg': 'Only admins can perform this action'}
+        403: {'description': 'Only admins can perform this action'}
     }
-
 })
 @jwt_required()
-def deliver_loan():
+def deliver_loan(loan_id):
     if not current_user.is_admin:
         return jsonify({"msg": "Only admins can perform this action"}), 403
-    
-    loan_id = request.form.get("loan_id")
-    due_date = datetime.utcnow()
-    loan = Loan.query.filter_by(id=loan_id)
-    book = Book.query.filter_by(id=loan.book_id)
+
+    loan = Loan.query.filter_by(id=loan_id).first()
+    if not loan:
+        return jsonify({"msg": "Loan not found"}), 404
+
+    if loan.is_returned:
+        return jsonify({"msg": "Loan already returned"}), 400
+
+    book = Book.query.filter_by(id=loan.book_id).first()
+    if not book:
+        return jsonify({"msg": "Book not found"}), 404
 
     book.available_copies += 1
     loan.is_returned = True
-    
-    return jsonify({'Book delivered successfully.'})
+    loan.return_date = datetime.utcnow()
+
+    db.session.commit()
+
+    return jsonify({"message": "Book delivered successfully."}), 201

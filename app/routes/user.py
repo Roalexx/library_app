@@ -10,12 +10,24 @@ user_bp = Blueprint("user", __name__)
 @swag_from({
     'tags': ['Users'],
     'summary': 'Create a new user',
-    'description': 'Creates a new user with username, email, and password.',
-    'consumes': ['application/x-www-form-urlencoded'],
+    'description': 'Creates a new user with username, email, password, and optional is_admin flag.',
+    'consumes': ['application/json'],
     'parameters': [
-        {'name':'username', 'in': 'formData', 'type': 'string', 'required': True, 'description': 'Username'},
-        {'name':'email', 'in': 'formData', 'type': 'string', 'required': True, 'description': 'e-mail'},
-        {'name':'password', 'in': 'formData', 'type': 'string', 'required': True, 'description': 'Password'}
+        {
+            'name': 'body',
+            'in': 'body',
+            'required': True,
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'username': {'type': 'string'},
+                    'email': {'type': 'string'},
+                    'password': {'type': 'string'},
+                    'is_admin': {'type': 'boolean', 'default': False}
+                },
+                'required': ['username', 'email', 'password']
+            }
+        }
     ],
     'responses': {
         201: {
@@ -23,13 +35,21 @@ user_bp = Blueprint("user", __name__)
             'examples': {
                 'application/json': {'message': 'User created'}
             }
+        },
+        400: {
+            'description': 'Missing data',
+            'examples': {
+                'application/json': {'error': 'Eksik veri'}
+            }
         }
     }
 })
 def create_user():
-    username = request.form.get("username")
-    email = request.form.get("email")
-    password = request.form.get("password")
+    data = request.get_json()
+    username = data.get("username")
+    email = data.get("email")
+    password = data.get("password")
+    is_admin = data.get("is_admin", False) 
 
     if not username or not email or not password:
         return jsonify({"error": "Eksik veri"}), 400
@@ -37,7 +57,8 @@ def create_user():
     new_user = User(
         username=username,
         email=email,
-        password_hash=generate_password_hash(password)
+        password_hash=generate_password_hash(password),
+        is_admin=is_admin
     )
     db.session.add(new_user)
     db.session.commit()
@@ -67,37 +88,50 @@ def list_users():
     ])
 
 
-@user_bp.route("/users", methods=["PUT"])
+@user_bp.route("/users/<int:user_id>", methods=["PUT"])
 @swag_from({
     'tags': ['Users'],
     'summary': 'Update a user',
     'security': [{'Bearer': []}],
     'description': 'Updates the username, email or password of a user.',
-    'consumes': ['application/x-www-form-urlencoded'],
+    'consumes': ['application/json'],
     'parameters': [
-        {'name':'user_id', 'in': 'formData', 'type': 'integer', 'required': True, 'description': 'User ID'},
-        {'name':'username', 'in': 'formData', 'type': 'string', 'required': True, 'description': 'Username'},
-        {'name':'email', 'in': 'formData', 'type': 'string', 'required': True, 'description': 'e-mail'},
-        {'name':'password', 'in': 'formData', 'type': 'string', 'required': True, 'description': 'Password'}
-    ],
-    'responses': {
-        200: {
-            'description': 'User updated successfully',
-            'examples': {
-                'application/json': {'message': 'User updated'}
+        {
+            'name': 'user_id',
+            'in': 'path',
+            'type': 'integer',
+            'required': True,
+            'description': 'ID of the user to update'
+        },
+        {
+            'name': 'body',
+            'in': 'body',
+            'required': True,
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'username': {'type': 'string'},
+                    'email': {'type': 'string'},
+                    'password': {'type': 'string'}
+                },
+                'required': ['username', 'email']
             }
         }
+    ],
+    'responses': {
+        200: {'description': 'User updated successfully'},
+        404: {'description': 'User not found'}
     }
 })
 @jwt_required()
-def update_user():
-    user_id = request.form.get("user_id", type=int)
+def update_user(user_id):
     user = User.query.get_or_404(user_id)
+    data = request.get_json()
 
-    user.username = request.form.get("username")
-    user.email = request.form.get("email")
+    user.username = data.get("username", user.username)
+    user.email = data.get("email", user.email)
 
-    password = request.form.get("password")
+    password = data.get("password")
     if password:
         user.password_hash = generate_password_hash(password)
 
@@ -105,32 +139,29 @@ def update_user():
     return jsonify({"message": "User updated"}), 200
 
 
-@user_bp.route("/users", methods=["DELETE"])
+@user_bp.route("/users/<int:user_id>", methods=["DELETE"])
 @swag_from({
     'tags': ['Users'],
     'summary': 'Delete a user',
     'security': [{'Bearer': []}],
     'description': 'Deletes a user by ID.',
-    'consumes': ['application/x-www-form-urlencoded'],
     'parameters': [
-        {'name':'user_id', 'in': 'formData', 'type': 'integer', 'required': True, 'description': 'User ID to delete'},        
+        {
+            'name': 'user_id',
+            'in': 'path',
+            'type': 'integer',
+            'required': True,
+            'description': 'ID of the user to delete'
+        }
     ],
     'responses': {
-        200: {
-            'description': 'User deleted successfully',
-            'examples': {
-                'application/json': {'message': 'User deleted'}
-            }
-        },
-        404: {
-            'description': 'User not found'
-        }
+        200: {'description': 'User deleted successfully'},
+        404: {'description': 'User not found'}
     }
 })
 @jwt_required()
-def delete_user():
-    user_id = request.form.get("user_id", type=int)
+def delete_user(user_id):
     user = User.query.get_or_404(user_id)
     db.session.delete(user)
     db.session.commit()
-    return jsonify({"message": "User deleted"})
+    return jsonify({"message": "User deleted"}), 200

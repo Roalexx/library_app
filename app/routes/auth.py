@@ -1,7 +1,8 @@
 from flask import request, jsonify, Blueprint
 from flasgger import swag_from
 from flask_jwt_extended import create_access_token, jwt_required, current_user
-from app.models import User
+from werkzeug.security import generate_password_hash
+from app.models import User, db
 from werkzeug.security import check_password_hash
 
 auth_bp = Blueprint("auth", __name__)
@@ -9,25 +10,39 @@ auth_bp = Blueprint("auth", __name__)
 @auth_bp.route("/login", methods=["POST"])
 @swag_from({
     'tags': ['Auth'],
-    'summary': 'login User',
-    'description': 'login with username and password.',
-    'consumes': ['application/x-www-form-urlencoded'],
+    'summary': 'Login User',
+    'description': 'Login with username and password.',
+    'consumes': ['application/json'],
     'parameters': [
-        {'name':'username', 'in': 'formData', 'type': 'string', 'required': True, 'description': 'Username'},
-        {'name':'password', 'in': 'formData', 'type': 'string', 'required': True, 'description': 'Password'}
-    ],
-    'responses': {
-        201: {
-            'description': 'User logged in successfully',
-            'examples': {
-                'application/json': {'message': 'user_token : 123456'}
+        {
+            'name': 'body',
+            'in': 'body',
+            'required': True,
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'username': {'type': 'string'},
+                    'password': {'type': 'string'}
+                },
+                'required': ['username', 'password']
             }
         }
+    ],
+    'responses': {
+        200: {
+            'description': 'User logged in successfully',
+            'examples': {
+                'application/json': {'user_token': '123456'}
+            }
+        },
+        400: {'description': 'Missing username or password'},
+        401: {'description': 'Bad username or password'}
     }
 })
 def login():
-    username = request.form.get("username")
-    password = request.form.get("password")
+    data = request.get_json()
+    username = data.get("username")
+    password = data.get("password")
 
     if not username or not password:
         return jsonify({"msg": "Username and password are required"}), 400
@@ -38,6 +53,62 @@ def login():
 
     access_token = create_access_token(identity=str(user.id))
     return jsonify({'user_token': access_token}), 200
+
+
+@auth_bp.route("/register", methods=["POST"])
+@swag_from({
+    'tags': ['Auth'],
+    'summary': 'Register a new user',
+    'description': 'Registers a new user using username, email, and password.',
+    'consumes': ['application/json'],
+    'parameters': [
+        {
+            'name': 'body',
+            'in': 'body',
+            'required': True,
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'username': {'type': 'string'},
+                    'email': {'type': 'string'},
+                    'password': {'type': 'string'}
+                },
+                'required': ['username', 'email', 'password']
+            }
+        }
+    ],
+    'responses': {
+        201: {
+            'description': 'User registered successfully',
+            'examples': {
+                'application/json': {'message': 'User registered'}
+            }
+        },
+        400: {
+            'description': 'Missing data',
+            'examples': {
+                'application/json': {'error': 'Eksik veri'}
+            }
+        }
+    }
+})
+def register():
+    data = request.get_json()
+    username = data.get("username")
+    email = data.get("email")
+    password = data.get("password")
+
+    if not username or not email or not password:
+        return jsonify({"error": "Eksik veri"}), 400
+
+    new_user = User(
+        username=username,
+        email=email,
+        password_hash=generate_password_hash(password)
+    )
+    db.session.add(new_user)
+    db.session.commit()
+    return jsonify({"message": "User registered"}), 201
 
 @auth_bp.route("/who_am_i", methods=["GET"])
 @swag_from({
